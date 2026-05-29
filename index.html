@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>سامانه جامع و هوشمند آزمون‌های آنلاین</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: linear-gradient(135deg, #f0fdf4 0%, #e6f4ea 100%);
+            font-family: 'Tahoma', 'Segoe UI', sans-serif;
+            padding: 30px 20px;
+        }
+        .container {
+            max-width: 650px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 30px;
+            box-shadow: 0 20px 35px -12px rgba(0,0,0,0.1);
+            padding: 35px;
+            transition: max-width 0.4s ease;
+        }
+        .main-header { text-align: center; color: #15803d; margin-bottom: 25px; font-size: 1.6rem; font-weight: bold; }
+        
+        .tabs { display: flex; gap: 10px; margin-bottom: 30px; background: #f1f5f9; padding: 6px; border-radius: 40px; }
+        .tab-btn { flex: 1; padding: 12px; border: none; border-radius: 30px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: 0.3s; color: #475569; background: transparent; }
+        .tab-btn.active { background: #ffffff; color: #16a34a; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        
+        .panel { display: none; }
+        .panel.active { display: block; animation: fadeIn 0.3s ease-in-out; }
+
+        label { display: block; margin-top: 15px; margin-bottom: 5px; font-weight: bold; color: #1e293b; font-size: 0.9rem; }
+        select, input, button { width: 100%; padding: 12px 16px; border: 2px solid #e2e8f0; border-radius: 25px; font-size: 0.95rem; outline: none; transition: 0.2s; }
+        select:focus, input:focus { border-color: #16a34a; box-shadow: 0 0 0 3px rgba(22,163,74,0.15); }
+        
+        .btn-green { background: linear-gradient(95deg, #16a34a, #15803d); border: none; color: white; font-weight: bold; margin-top: 25px; cursor: pointer; box-shadow: 0 5px 12px rgba(22,163,74,0.2); }
+        .btn-green:hover { transform: scale(1.01); background: linear-gradient(95deg, #15803d, #166534); }
+        
+        .btn-orange { background: linear-gradient(95deg, #ff8c42, #ff6a2e); border: none; color: white; font-weight: bold; margin-top: 25px; cursor: pointer; box-shadow: 0 5px 12px rgba(255,108,46,0.3); }
+        .btn-orange:hover { transform: scale(1.01); background: linear-gradient(95deg, #ff7a2e, #ff571a); }
+
+        #displayFrame { width: 100%; height: 850px; border: 2px solid #e2e8f0; margin-top: 30px; display: none; background: white; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+        
+        .footer { text-align: center; margin-top: 25px; font-size: 0.8rem; color: #64748b; border-top: 1px dashed #e2e8f0; padding-top: 15px; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+<div class="container" id="mainContainer">
+    <div class="main-header">🏛️ سامانه هوشمند و جامع آزمون آنلاین</div>
+    
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('reportPanel', this)">📊 دریافت کارنامه آنلاین</button>
+        <button class="tab-btn" onclick="switchTab('formPanel', this)">📝 ورود به پاسخبرگ آزمون</button>
+    </div>
+
+    <div id="reportPanel" class="panel active">
+        <label>🗓️ انتخاب تاریخ آزمون</label>
+        <select id="dateSelect" onchange="onDateChange()"><option value="">ابتدا تاریخ را انتخاب کنید</option></select>
+
+        <label>🏛️ انتخاب موسسه</label>
+        <select id="instSelect" onchange="onInstChange()" disabled><option value="">ابتدا موسسه را انتخاب کنید</option></select>
+
+        <label>🎓 انتخاب سطح / کد گروه</label>
+        <select id="levelSelect" onchange="onLevelChange()" disabled><option value="">ابتدا سطح را انتخاب کنید</option></select>
+
+        <label>🧪 انتخاب عنوان آزمون</label>
+        <select id="examSelect" onchange="onExamChange()" disabled><option value="">ابتدا آزمون را انتخاب کنید</option></select>
+
+        <label>👤 نام و نام خانوادگی دانش‌آموز</label>
+        <select id="studentSelect" disabled><option value="">ابتدا دانش‌آموز را انتخاب کنید</option></select>
+
+        <label>🔐 رمز عبور شخصی</label>
+        <input type="password" id="studentPassword" placeholder="رمز عبور شخصی شما">
+
+        <button class="btn-green" onclick="fetchAndUnlockReport()">🔍 مشاهده و دریافت کارنامه</button>
+    </div>
+
+    <div id="formPanel" class="panel">
+        <label>🗓️ انتخاب تاریخ پاسخبرگ</label>
+        <select id="fDateSelect" onchange="onFormDateChange()"><option value="">ابتدا تاریخ را انتخاب کنید</option></select>
+
+        <label>🏛️ انتخاب موسسه / ارگان</label>
+        <select id="fInstSelect" onchange="onFormInstChange()" disabled><option value="">ابتدا موسسه را انتخاب کنید</option></select>
+
+        <label>🧪 انتخاب عنوان پاسخبرگ</label>
+        <select id="fExamSelect" disabled><option value="">ابتدا پاسخبرگ را انتخاب کنید</option></select>
+
+        <button class="btn-orange" onclick="loadExternalPasokhbarg()">📝 باز کردن و شروع پاسخگویی</button>
+    </div>
+
+    <div class="footer">✨ طراحی شده توسط نیما پیام - کلیه حقوق محفوظ است ✨</div>
+</div>
+
+<iframe id="displayFrame"></iframe>
+
+<script>
+    const CLOUD_BASE_URL = "./"; 
+    let reportsDB = {};
+    let formsDB = {};
+
+    // بارگذاری دیتابیس‌ها به محض باز شدن سایت
+    async function initSystem() {
+        try {
+            const res = await fetch(CLOUD_BASE_URL + 'reports_list.json');
+            if (res.ok) {
+                reportsDB = await res.json();
+                populateDateSelect(reportsDB, 'dateSelect');
+            }
+        } catch(e) { console.log("خطا در لود دیتابیس کارنامه‌ها"); }
+
+        try {
+            const res = await fetch(CLOUD_BASE_URL + 'forms_list.json');
+            if (res.ok) {
+                formsDB = await res.json();
+                populateDateSelect(formsDB, 'fDateSelect');
+            }
+        } catch(e) { console.log("خطا در لود دیتابیس پاسخبرگ‌ها"); }
+    }
+
+    function populateDateSelect(db, selectId) {
+        const select = document.getElementById(selectId);
+        Object.keys(db).forEach(date => {
+            let option = document.createElement('option');
+            option.value = date; 
+            option.textContent = date.replace(/_/g, '.');
+            select.appendChild(option);
+        });
+    }
+
+    function switchTab(panelId, btn) {
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(panelId).classList.add('active');
+        btn.classList.add('active');
+        
+        document.getElementById('displayFrame').style.display = "none";
+        document.getElementById('mainContainer').style.maxWidth = "650px";
+    }
+
+    function resetSelects(ids) {
+        ids.forEach(id => {
+            const select = document.getElementById(id);
+            select.innerHTML = `<option value="">انتخاب کنید...</option>`;
+            select.disabled = true;
+        });
+    }
+
+    // ================= منطق انتخاب و لود پاسخبرگ‌ها =================
+    function onFormDateChange() {
+        const date = document.getElementById('fDateSelect').value;
+        resetSelects(['fInstSelect', 'fExamSelect']);
+        if (!date || !formsDB[date]) return;
+        const select = document.getElementById('fInstSelect');
+        select.disabled = false;
+        Object.keys(formsDB[date]).forEach(inst => {
+            let option = document.createElement('option');
+            option.value = inst; 
+            option.textContent = inst.replace(/_/g, ' ');
+            select.appendChild(option);
+        });
+    }
+
+    function onFormInstChange() {
+        const date = document.getElementById('fDateSelect').value;
+        const inst = document.getElementById('fInstSelect').value;
+        resetSelects(['fExamSelect']);
+        if (!inst || !formsDB[date][inst]) return;
+        const select = document.getElementById('fExamSelect');
+        select.disabled = false;
+        Object.keys(formsDB[date][inst]).forEach(exam => {
+            let option = document.createElement('option');
+            option.value = formsDB[date][inst][exam]; 
+            option.textContent = exam.replace(/_/g, ' ');
+            select.appendChild(option);
+        });
+    }
+
+    async function loadExternalPasokhbarg() {
+        const htmlRelativePath = document.getElementById('fExamSelect').value;
+        const frame = document.getElementById('displayFrame');
+        const container = document.getElementById('mainContainer');
+
+        if (!htmlRelativePath) {
+            alert("لطفاً پاسخبرگ مورد نظر خود را انتخاب کنید.");
+            return;
+        }
+
+        try {
+            const response = await fetch(CLOUD_BASE_URL + htmlRelativePath);
+            if (!response.ok) throw new Error("فایل پاسخبرگ فیزیکی پیدا نشد.");
+            const htmlContent = await response.text();
+
+            container.style.maxWidth = "1000px";
+            frame.style.display = "block";
+            
+            const doc = frame.contentWindow.document;
+            doc.open(); doc.write(htmlContent); doc.close();
+            frame.scrollIntoView({ behavior: 'smooth' });
+
+        } catch (error) {
+            alert("خطا در بارگذاری فایل پاسخبرگ: " + error.message);
+        }
+    }
+
+    // ================= منطق منوهای کارنامه =================
+    function onDateChange() {
+        const date = document.getElementById('dateSelect').value;
+        resetSelects(['instSelect', 'levelSelect', 'examSelect', 'studentSelect']);
+        if (!date || !reportsDB[date]) return;
+        const select = document.getElementById('instSelect'); 
+        select.disabled = false;
+        Object.keys(reportsDB[date]).forEach(inst => {
+            let option = document.createElement('option'); 
+            option.value = inst; 
+            option.textContent = inst; 
+            select.appendChild(option);
+        });
+    }
+
+    function onInstChange() {
+        const date = document.getElementById('dateSelect').value;
+        const inst = document.getElementById('instSelect').value;
+        resetSelects(['levelSelect', 'examSelect', 'studentSelect']);
+        if (!inst || !reportsDB[date][inst]) return;
+        const select = document.getElementById('levelSelect'); 
+        select.disabled = false;
+        Object.keys(reportsDB[date][inst]).forEach(lvl => {
+            let option = document.createElement('option'); 
+            option.value = lvl; 
+            option.textContent = lvl; 
+            select.appendChild(option);
+        });
+    }
+
+    function onLevelChange() {
+        const date = document.getElementById('dateSelect').value;
+        const inst = document.getElementById('instSelect').value;
+        const lvl = document.getElementById('levelSelect').value;
+        resetSelects(['examSelect', 'studentSelect']);
+        if (!lvl || !reportsDB[date][inst][lvl]) return;
+        const select = document.getElementById('examSelect'); 
+        select.disabled = false;
+        Object.keys(reportsDB[date][inst][lvl]).forEach(exam => {
+            let option = document.createElement('option'); 
+            option.value = exam; 
+            option.textContent = exam; 
+            select.appendChild(option);
+        });
+    }
+
+    function onExamChange() {
+        const date = document.getElementById('dateSelect').value;
+        const inst = document.getElementById('instSelect').value;
+        const lvl = document.getElementById('levelSelect').value;
+        const exam = document.getElementById('examSelect').value;
+        resetSelects(['studentSelect']);
+        if (!exam || !reportsDB[date][inst][lvl][exam]) return;
+        const select = document.getElementById('studentSelect'); 
+        select.disabled = false;
+        
+        const targetData = reportsDB[date][inst][lvl][exam];
+        const studentsArray = Array.isArray(targetData) ? targetData : (targetData.students || []);
+        
+        studentsArray.forEach(stu => {
+            let option = document.createElement('option'); 
+            option.value = stu.file_name; 
+            option.textContent = stu.name; 
+            select.appendChild(option);
+        });
+    }
+
+    // ================= منطق جادویی رمزگشایی دو لایه =================
+    async function fetchAndUnlockReport() {
+        const fileRelativePath = document.getElementById('studentSelect').value;
+        const password = document.getElementById('studentPassword').value.trim();
+        const frame = document.getElementById('displayFrame');
+        const container = document.getElementById('mainContainer');
+
+        if (!fileRelativePath || !password) {
+            alert("لطفاً تمامی گزینه‌ها و رمز عبور را وارد کنید.");
+            return;
+        }
+
+        try {
+            // ۱. دریافت فایل زیپ اصلی از گیت‌هاب
+            const response = await fetch(CLOUD_BASE_URL + fileRelativePath);
+            if (!response.ok) throw new Error("فایل کارنامه یافت نشد.");
+            const arrayBuffer = await response.arrayBuffer();
+
+            // ۲. باز کردن لایه اول (Outer) با پسورد ثابت سیستم
+            const zip = await JSZip.loadAsync(arrayBuffer, { password: "OuterSecret@2024" });
+            
+            // پیدا کردن فایل زیپ داخلی
+            const innerZipFile = Object.keys(zip.files).find(f => f.endsWith('.zip'));
+            if (!innerZipFile) throw new Error("ساختار فایل آرشیو با مدل لایه‌بندی همخوانی ندارد.");
+            
+            const innerZipBuffer = await zip.files[innerZipFile].async("arraybuffer");
+
+            // ۳. باز کردن لایه داخلی با پسورد اختصاصی داوطلب
+            const innerZip = await JSZip.loadAsync(innerZipBuffer, { password: password });
+            
+            const htmlFile = innerZip.file("index.html");
+            if (!htmlFile) throw new Error("فایل داخل پکیج نامعتبر است.");
+            const htmlContent = await htmlFile.async("string");
+
+            // ۴. رندر و نمایش کامل کارنامه
+            container.style.maxWidth = "1000px";
+            frame.style.display = "block";
+            const doc = frame.contentWindow.document;
+            doc.open(); doc.write(htmlContent); doc.close();
+            frame.scrollIntoView({ behavior: 'smooth' });
+            
+        } catch (error) {
+            console.error(error);
+            alert("خطا در رمزگشایی کارنامه! احتمالاً رمز عبور اشتباه است یا ساختار فایل با رمز همخوانی ندارد.");
+        }
+    }
+
+    window.onload = initSystem;
+</script>
+</body>
+</html>
