@@ -73,7 +73,7 @@
         <select id="studentSelect" disabled><option value="">ابتدا دانش‌آموز را انتخاب کنید</option></select>
 
         <label>🔐 رمز عبور شخصی</label>
-        <input type="password" id="studentPassword" placeholder="رمز عبور ثبت شده در پاسخبرگ">
+        <input type="password" id="studentPassword" placeholder="رمز عبور شخصی شما">
 
         <button class="btn-green" onclick="fetchAndUnlockReport()">🔍 مشاهده و دریافت کارنامه</button>
     </div>
@@ -101,7 +101,7 @@
     let reportsDB = {};
     let formsDB = {};
 
-    // لود همزمان هر دو دیتابیس به محض باز شدن سایت
+    // بارگذاری دیتابیس‌ها به محض باز شدن سایت
     async function initSystem() {
         try {
             const res = await fetch(CLOUD_BASE_URL + 'reports_list.json');
@@ -261,7 +261,6 @@
         const select = document.getElementById('studentSelect'); 
         select.disabled = false;
         
-        // سازگاری با ساختار آبجکتی آرایه دانش‌آموزان در دیتابیس کارنامه‌ها
         const targetData = reportsDB[date][inst][lvl][exam];
         const studentsArray = Array.isArray(targetData) ? targetData : (targetData.students || []);
         
@@ -273,6 +272,7 @@
         });
     }
 
+    // ================= منطق جادویی رمزگشایی دو لایه =================
     async function fetchAndUnlockReport() {
         const fileRelativePath = document.getElementById('studentSelect').value;
         const password = document.getElementById('studentPassword').value.trim();
@@ -285,29 +285,36 @@
         }
 
         try {
+            // ۱. دریافت فایل زیپ اصلی از گیت‌هاب
             const response = await fetch(CLOUD_BASE_URL + fileRelativePath);
             if (!response.ok) throw new Error("فایل کارنامه یافت نشد.");
             const arrayBuffer = await response.arrayBuffer();
 
-            // باز کردن پوسته بیرونی بدون رمز بر اساس خروجی جدید پایتون شما
-            const zip = await JSZip.loadAsync(arrayBuffer);
+            // ۲. باز کردن لایه اول (Outer) با پسورد ثابت سیستم
+            const zip = await JSZip.loadAsync(arrayBuffer, { password: "OuterSecret@2024" });
+            
+            // پیدا کردن فایل زیپ داخلی
             const innerZipFile = Object.keys(zip.files).find(f => f.endsWith('.zip'));
-            if (!innerZipFile) throw new Error("ساختار فایل آرشیو ناامیدکننده است.");
+            if (!innerZipFile) throw new Error("ساختار فایل آرشیو با مدل لایه‌بندی همخوانی ندارد.");
             
             const innerZipBuffer = await zip.files[innerZipFile].async("arraybuffer");
 
-            // باز کردن لایه داخلی با پسورد اختصاصی و منحصربه‌فرد دانش‌آموز
+            // ۳. باز کردن لایه داخلی با پسورد اختصاصی داوطلب
             const innerZip = await JSZip.loadAsync(innerZipBuffer, { password: password });
+            
             const htmlFile = innerZip.file("index.html");
             if (!htmlFile) throw new Error("فایل داخل پکیج نامعتبر است.");
             const htmlContent = await htmlFile.async("string");
 
+            // ۴. رندر و نمایش کامل کارنامه
             container.style.maxWidth = "1000px";
             frame.style.display = "block";
             const doc = frame.contentWindow.document;
             doc.open(); doc.write(htmlContent); doc.close();
             frame.scrollIntoView({ behavior: 'smooth' });
+            
         } catch (error) {
+            console.error(error);
             alert("خطا در رمزگشایی کارنامه! احتمالاً رمز عبور اشتباه است یا ساختار فایل با رمز همخوانی ندارد.");
         }
     }
