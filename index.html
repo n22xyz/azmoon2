@@ -23,7 +23,6 @@
         }
         .main-header { text-align: center; color: #15803d; margin-bottom: 25px; font-size: 1.6rem; font-weight: bold; }
         
-        /* استایل تب‌های سوییچ کننده بالای سایت */
         .tabs { display: flex; gap: 10px; margin-bottom: 30px; background: #f1f5f9; padding: 6px; border-radius: 40px; }
         .tab-btn { flex: 1; padding: 12px; border: none; border-radius: 30px; font-size: 1rem; font-weight: bold; cursor: pointer; transition: 0.3s; color: #475569; background: transparent; }
         .tab-btn.active { background: #ffffff; color: #16a34a; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
@@ -41,7 +40,6 @@
         .btn-orange { background: linear-gradient(95deg, #ff8c42, #ff6a2e); border: none; color: white; font-weight: bold; margin-top: 25px; cursor: pointer; box-shadow: 0 5px 12px rgba(255,108,46,0.3); }
         .btn-orange:hover { transform: scale(1.01); background: linear-gradient(95deg, #ff7a2e, #ff571a); }
 
-        /* آی‌فریم همه‌کاره برای لود کارنامه و پاسخبرگ‌ها */
         #displayFrame { width: 100%; height: 850px; border: 2px solid #e2e8f0; margin-top: 30px; display: none; background: white; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
         
         .footer { text-align: center; margin-top: 25px; font-size: 0.8rem; color: #64748b; border-top: 1px dashed #e2e8f0; padding-top: 15px; }
@@ -87,7 +85,7 @@
         <label>🏛️ انتخاب موسسه / ارگان</label>
         <select id="fInstSelect" onchange="onFormInstChange()" disabled><option value="">ابتدا موسسه را انتخاب کنید</option></select>
 
-        <label>🧪 انتخاب عنوان پاسخبرگ (فایل HTML)</label>
+        <label>🧪 انتخاب عنوان پاسخبرگ</label>
         <select id="fExamSelect" disabled><option value="">ابتدا پاسخبرگ را انتخاب کنید</option></select>
 
         <button class="btn-orange" onclick="loadExternalPasokhbarg()">📝 باز کردن و شروع پاسخگویی</button>
@@ -99,37 +97,35 @@
 <iframe id="displayFrame"></iframe>
 
 <script>
-    const OUTER_PASSWORD = "OuterSecret@2024";
     const CLOUD_BASE_URL = "./"; 
     let reportsDB = {};
     let formsDB = {};
 
     // لود همزمان هر دو دیتابیس به محض باز شدن سایت
     async function initSystem() {
-        // ۱. بارگذاری دیتابیس کارنامه‌ها
         try {
             const res = await fetch(CLOUD_BASE_URL + 'reports_list.json');
             if (res.ok) {
                 reportsDB = await res.json();
                 populateDateSelect(reportsDB, 'dateSelect');
             }
-        } catch(e) { console.log("در انتظار دیتابیس کارنامه‌ها..."); }
+        } catch(e) { console.log("خطا در لود دیتابیس کارنامه‌ها"); }
 
-        // ۲. بارگذاری دیتابیس مستقل پاسخبرگ‌ها
         try {
             const res = await fetch(CLOUD_BASE_URL + 'forms_list.json');
             if (res.ok) {
                 formsDB = await res.json();
                 populateDateSelect(formsDB, 'fDateSelect');
             }
-        } catch(e) { console.log("در انتظار دیتابیس پاسخبرگ‌ها..."); }
+        } catch(e) { console.log("خطا در لود دیتابیس پاسخبرگ‌ها"); }
     }
 
     function populateDateSelect(db, selectId) {
         const select = document.getElementById(selectId);
         Object.keys(db).forEach(date => {
             let option = document.createElement('option');
-            option.value = date; option.textContent = date.replace(/_/g, '.');
+            option.value = date; 
+            option.textContent = date.replace(/_/g, '.');
             select.appendChild(option);
         });
     }
@@ -144,7 +140,15 @@
         document.getElementById('mainContainer').style.maxWidth = "650px";
     }
 
-    // ================= منطق انتخاب و لود پاسخبرگ‌های فیزیکی =================
+    function resetSelects(ids) {
+        ids.forEach(id => {
+            const select = document.getElementById(id);
+            select.innerHTML = `<option value="">انتخاب کنید...</option>`;
+            select.disabled = true;
+        });
+    }
+
+    // ================= منطق انتخاب و لود پاسخبرگ‌ها =================
     function onFormDateChange() {
         const date = document.getElementById('fDateSelect').value;
         resetSelects(['fInstSelect', 'fExamSelect']);
@@ -153,7 +157,8 @@
         select.disabled = false;
         Object.keys(formsDB[date]).forEach(inst => {
             let option = document.createElement('option');
-            option.value = inst; option.textContent = inst.replace(/_/g, ' ');
+            option.value = inst; 
+            option.textContent = inst.replace(/_/g, ' ');
             select.appendChild(option);
         });
     }
@@ -167,7 +172,7 @@
         select.disabled = false;
         Object.keys(formsDB[date][inst]).forEach(exam => {
             let option = document.createElement('option');
-            option.value = formsDB[date][inst][exam]; // جاده یا همان آدرس وب فایل html
+            option.value = formsDB[date][inst][exam]; 
             option.textContent = exam.replace(/_/g, ' ');
             select.appendChild(option);
         });
@@ -184,12 +189,10 @@
         }
 
         try {
-            // صدا زدن مستقیم فایل HTML از درون پوشه pasokhbarg گیت‌هاب شما
             const response = await fetch(CLOUD_BASE_URL + htmlRelativePath);
             if (!response.ok) throw new Error("فایل پاسخبرگ فیزیکی پیدا نشد.");
             const htmlContent = await response.text();
 
-            // بزرگ کردن عرض صفحه برای راحتی کار با پاسخبرگ و رندر آن در آی‌فریم
             container.style.maxWidth = "1000px";
             frame.style.display = "block";
             
@@ -202,14 +205,18 @@
         }
     }
 
-    // ================= منطق کارنامه‌ها (بدون تغییر) =================
+    // ================= منطق منوهای کارنامه =================
     function onDateChange() {
         const date = document.getElementById('dateSelect').value;
         resetSelects(['instSelect', 'levelSelect', 'examSelect', 'studentSelect']);
         if (!date || !reportsDB[date]) return;
-        const select = document.getElementById('instSelect'); select.disabled = false;
+        const select = document.getElementById('instSelect'); 
+        select.disabled = false;
         Object.keys(reportsDB[date]).forEach(inst => {
-            let option = document.createElement('option'); option.value = inst; option.textContent = inst; select.appendChild(option);
+            let option = document.createElement('option'); 
+            option.value = inst; 
+            option.textContent = inst; 
+            select.appendChild(option);
         });
     }
 
@@ -217,10 +224,14 @@
         const date = document.getElementById('dateSelect').value;
         const inst = document.getElementById('instSelect').value;
         resetSelects(['levelSelect', 'examSelect', 'studentSelect']);
-        if (!inst) return;
-        const select = document.getElementById('levelSelect'); select.disabled = false;
+        if (!inst || !reportsDB[date][inst]) return;
+        const select = document.getElementById('levelSelect'); 
+        select.disabled = false;
         Object.keys(reportsDB[date][inst]).forEach(lvl => {
-            let option = document.createElement('option'); option.value = lvl; option.textContent = lvl; select.appendChild(option);
+            let option = document.createElement('option'); 
+            option.value = lvl; 
+            option.textContent = lvl; 
+            select.appendChild(option);
         });
     }
 
@@ -229,10 +240,14 @@
         const inst = document.getElementById('instSelect').value;
         const lvl = document.getElementById('levelSelect').value;
         resetSelects(['examSelect', 'studentSelect']);
-        if (!lvl) return;
-        const select = document.getElementById('examSelect'); select.disabled = false;
+        if (!lvl || !reportsDB[date][inst][lvl]) return;
+        const select = document.getElementById('examSelect'); 
+        select.disabled = false;
         Object.keys(reportsDB[date][inst][lvl]).forEach(exam => {
-            let option = document.createElement('option'); option.value = exam; option.textContent = exam; select.appendChild(option);
+            let option = document.createElement('option'); 
+            option.value = exam; 
+            option.textContent = exam; 
+            select.appendChild(option);
         });
     }
 
@@ -242,18 +257,19 @@
         const lvl = document.getElementById('levelSelect').value;
         const exam = document.getElementById('examSelect').value;
         resetSelects(['studentSelect']);
-        if (!exam) return;
-        const select = document.getElementById('studentSelect'); select.disabled = false;
-        reportsDB[date][inst][lvl][exam].forEach(stu => {
-            let option = document.createElement('option'); option.value = stu.file_name; option.textContent = stu.name; select.appendChild(option);
-        });
-    }
-
-    function resetSelects(ids) {
-        ids.forEach(id => {
-            const select = document.getElementById(id);
-            select.innerHTML = `<option value="">انتخاب کنید...</option>`;
-            select.disabled = true;
+        if (!exam || !reportsDB[date][inst][lvl][exam]) return;
+        const select = document.getElementById('studentSelect'); 
+        select.disabled = false;
+        
+        // سازگاری با ساختار آبجکتی آرایه دانش‌آموزان در دیتابیس کارنامه‌ها
+        const targetData = reportsDB[date][inst][lvl][exam];
+        const studentsArray = Array.isArray(targetData) ? targetData : (targetData.students || []);
+        
+        studentsArray.forEach(stu => {
+            let option = document.createElement('option'); 
+            option.value = stu.file_name; 
+            option.textContent = stu.name; 
+            select.appendChild(option);
         });
     }
 
@@ -273,13 +289,17 @@
             if (!response.ok) throw new Error("فایل کارنامه یافت نشد.");
             const arrayBuffer = await response.arrayBuffer();
 
+            // باز کردن پوسته بیرونی بدون رمز بر اساس خروجی جدید پایتون شما
             const zip = await JSZip.loadAsync(arrayBuffer);
             const innerZipFile = Object.keys(zip.files).find(f => f.endsWith('.zip'));
+            if (!innerZipFile) throw new Error("ساختار فایل آرشیو ناامیدکننده است.");
+            
             const innerZipBuffer = await zip.files[innerZipFile].async("arraybuffer");
 
-            const innerZip = await JSZip.loadAsync(innerZipBuffer);
+            // باز کردن لایه داخلی با پسورد اختصاصی و منحصربه‌فرد دانش‌آموز
+            const innerZip = await JSZip.loadAsync(innerZipBuffer, { password: password });
             const htmlFile = innerZip.file("index.html");
-            if (!htmlFile) throw new Error("محتوای کارنامه معتبر نیست.");
+            if (!htmlFile) throw new Error("فایل داخل پکیج نامعتبر است.");
             const htmlContent = await htmlFile.async("string");
 
             container.style.maxWidth = "1000px";
@@ -288,7 +308,7 @@
             doc.open(); doc.write(htmlContent); doc.close();
             frame.scrollIntoView({ behavior: 'smooth' });
         } catch (error) {
-            alert("خطا در رمزگشایی کارنامه! احتمالاً رمز عبور اشتباه است.");
+            alert("خطا در رمزگشایی کارنامه! احتمالاً رمز عبور اشتباه است یا ساختار فایل با رمز همخوانی ندارد.");
         }
     }
 
