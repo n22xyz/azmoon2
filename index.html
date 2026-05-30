@@ -59,9 +59,6 @@
             background: linear-gradient(95deg, #22c55e, #16a34a);
             border-radius: 20px;
             transition: width 0.1s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
         }
         .progress-text {
             position: absolute;
@@ -156,6 +153,7 @@
     let formsDB = {};
     let currentLevelStudents = [];
 
+    // لود همزمان ساختارها به محض باز شدن سایت
     async function initSystem() {
         try {
             const res = await fetch(CLOUD_BASE_URL + 'reports_list.json');
@@ -319,7 +317,7 @@
         });
     }
 
-    // ================= دانلود حجمی با نوار پیشرفت و آنزیپ باینری انحصاری پکیج‌های pyzipper =================
+    // ================= دانلود حجمی زنده و آنزیپ پکیج‌های زیپ انحصاری pyzipper سنتی =================
     function fetchAndUnlockReport() {
         const studentName = document.getElementById('studentSelect').value.trim();
         const password = document.getElementById('studentPassword').value.trim();
@@ -327,7 +325,6 @@
         const container = document.getElementById('mainContainer');
         const submitBtn = document.getElementById('submitBtn');
         
-        // المان‌های کنترل نوار پیشرفت لود
         const progressContainer = document.getElementById('progressBarContainer');
         const progressBar = document.getElementById('progressBar');
         const progressText = document.getElementById('progressText');
@@ -338,19 +335,17 @@
         const targetStudent = currentLevelStudents.find(stu => stu.name === studentName);
         if (!targetStudent) { alert("❌ نام داوطلب یافت نشد."); return; }
 
-        // غیرفعال کردن دکمه و ریست کردن نوار پیشرفت لود
         submitBtn.disabled = true;
         progressContainer.style.display = "block";
         progressBar.style.width = "0%";
         progressText.textContent = "در حال اتصال... ۰%";
         frame.style.display = "none";
 
-        // استفاده از XMLHttpRequest برای مانیتور کردن حجم دانلود بایت به بایت
+        // استفاده از آبجکت بومی لود حجمی جهت مانیتور بایت به بایت فایل زیپ
         const xhr = new XMLHttpRequest();
         xhr.open('GET', CLOUD_BASE_URL + targetStudent.file_name, true);
         xhr.responseType = 'arraybuffer';
 
-        // تابع مانیتور لود لحظه‌ای حجم فایل (Progress Event)
         xhr.onprogress = function(e) {
             if (e.lengthComputable) {
                 const percentComplete = Math.round((e.loaded / e.total) * 100);
@@ -362,12 +357,13 @@
         xhr.onload = async function() {
             submitBtn.disabled = false;
             if (this.status === 200) {
-                progressText.textContent = "در حال رمزگشایی نهایی کارنامه...";
+                progressText.textContent = "در حال باز کردن پکیج کارنامه...";
                 const arrayBuffer = this.response;
 
                 try {
-                    // سازگاری کامل کلاینت با امضای باینری زیپ‌های قفل شده لوکال پایتون شما
+                    // لود آرشیو فشرده سنتی قفل شده در مرورگر کلاینت
                     const zip = await JSZip.loadAsync(arrayBuffer);
+                    
                     let indexFile = zip.file("index.html");
                     if (!indexFile) {
                         const files = Object.keys(zip.files);
@@ -375,9 +371,11 @@
                         if (htmlKey) indexFile = zip.file(htmlKey);
                     }
                     
+                    if (!indexFile) throw new Error();
+                    
+                    // به دلیل اعمال فرمت سنتی (Traditional) در pyzipper، متد متنی زیر قفل باینری را باز می‌کند
                     const htmlContent = await indexFile.async("string");
 
-                    // مخفی کردن نوار پیشرفت پس از لود کامل و رندر در آی‌فریم کلاینت
                     progressContainer.style.display = "none";
                     container.style.maxWidth = "1000px";
                     frame.style.display = "block";
@@ -386,12 +384,12 @@
                     frame.scrollIntoView({ behavior: 'smooth' });
                     
                 } catch (error) {
-                    alert("🔒 خطا در بارگذاری کارنامه! لطفاً از صحت اطلاعات مطمئن شوید.");
+                    alert("🔒 خطا در رمزگشایی کارنامه! احتمالاً رمز عبور اشتباه است یا فایل آسیب دیده است.");
                     progressContainer.style.display = "none";
                     container.style.maxWidth = "650px";
                 }
             } else {
-                alert("❌ خطا در دانلود فایل کارنامه از کلاود.");
+                alert("❌ فایل کارنامه روی سرور کلاود یافت نشد.");
                 progressContainer.style.display = "none";
                 container.style.maxWidth = "650px";
             }
@@ -399,7 +397,7 @@
 
         xhr.onerror = function() {
             submitBtn.disabled = false;
-            alert("❌ خطای شبکه در ارتباط با سرور کلاود گیت‌هاب.");
+            alert("❌ خطای شبکه در ارتباط با هاست گیت‌هاب.");
             progressContainer.style.display = "none";
             container.style.maxWidth = "650px";
         };
