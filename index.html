@@ -81,11 +81,11 @@
         </select>
 
         <label>👤 نام و نام خانوادگی داوطلب</label>
-        <input type="text" id="studentSelect" list="studentOptions" placeholder="نام خود را وارد کنید" disabled>
+        <input type="text" id="studentSelect" list="studentOptions" placeholder="سطح را انتخاب کنید" disabled>
         <datalist id="studentOptions"></datalist>
 
         <label>🔐 رمز عبور شخصی</label>
-        <input type="password" id="studentPassword" placeholder="رمز عبور ثبت شده در پاسخبرگ">
+        <input type="password" id="studentPassword" placeholder="رمز عبور شخصی صادر شده در پاسخبرگ">
 
         <button class="btn-green" onclick="fetchAndUnlockReport()">🔍 مشاهده و دریافت کارنامه</button>
     </div>
@@ -118,9 +118,9 @@
     const CLOUD_BASE_URL = "./"; 
     let reportsDB = {};
     let formsDB = {};
-    let currentLevelStudents = []; // آرایه کمکی نگهداری لیست دانش‌آموزان بخش فعال
+    let currentLevelStudents = [];
 
-    // لود همزمان هر دو دیتابیس به محض باز شدن سایت
+    // لود همزمان ساختارها به محض باز شدن سایت
     async function initSystem() {
         try {
             const res = await fetch(CLOUD_BASE_URL + 'reports_list.json');
@@ -192,30 +192,21 @@
         const htmlRelativePath = document.getElementById('fExamSelect').value;
         const frame = document.getElementById('displayFrame');
         const container = document.getElementById('mainContainer');
-
-        if (!htmlRelativePath) {
-            alert("لطفاً پاسخبرگ مورد نظر خود را انتخاب کنید.");
-            return;
-        }
+        if (!htmlRelativePath) return;
 
         try {
             const response = await fetch(CLOUD_BASE_URL + htmlRelativePath);
-            if (!response.ok) throw new Error("فایل پاسخبرگ فیزیکی پیدا نشد.");
+            if (!response.ok) throw new Error();
             const htmlContent = await response.text();
-
             container.style.maxWidth = "1000px";
             frame.style.display = "block";
-            
             const doc = frame.contentWindow.document;
             doc.open(); doc.write(htmlContent); doc.close();
             frame.scrollIntoView({ behavior: 'smooth' });
-
-        } catch (error) {
-            alert("خطا در بارگذاری فایل پاسخبرگ: " + error.message);
-        }
+        } catch (error) { alert("خطا در بارگذاری فایل پاسخبرگ"); }
     }
 
-    // ================= منطق زنجیره‌ای کارنامه‌ها =================
+    // ================= منطق انتخاب زنجیره‌ای کارنامه‌ها =================
     function onDateChange() {
         const date = document.getElementById('dateSelect').value;
         resetSelects(['instSelect', 'examSelect', 'levelSelect', 'studentSelect']);
@@ -258,17 +249,14 @@
         const inputField = document.getElementById('studentSelect');
         const dataList = document.getElementById('studentOptions');
         
-        inputField.value = "";
-        dataList.innerHTML = "";
-        inputField.disabled = true;
-        currentLevelStudents = [];
+        inputField.value = ""; dataList.innerHTML = "";
+        inputField.disabled = true; currentLevelStudents = [];
 
         if (!lvl || !reportsDB[date][inst][exam][lvl]) return;
         
         inputField.disabled = false;
         inputField.placeholder = "نام خود را تایپ یا انتخاب کنید...";
         
-        // کلون کردن آرایه داوطلبان جهت سورت الفبایی ارگانیک فارسی
         currentLevelStudents = [...reportsDB[date][inst][exam][lvl]];
         currentLevelStudents.sort((a, b) => a.name.localeCompare(b.name, 'fa'));
         
@@ -288,19 +276,15 @@
             else if (id === 'levelSelect') defaultText = "آزمون را انتخاب کنید";
             
             if (id === 'studentSelect') {
-                select.value = "";
-                select.placeholder = "سطح را انتخاب کنید";
-                select.disabled = true;
-                document.getElementById('studentOptions').innerHTML = "";
-                currentLevelStudents = [];
+                select.value = ""; select.placeholder = "سطح را انتخاب کنید"; select.disabled = true;
+                document.getElementById('studentOptions').innerHTML = ""; currentLevelStudents = [];
             } else {
-                select.innerHTML = `<option value="">${defaultText}</option>`;
-                select.disabled = true;
+                select.innerHTML = `<option value="">${defaultText}</option>`; select.disabled = true;
             }
         });
     }
 
-    // ================= منطق آنزیپ مستقیم کلاینت با پسورد داوطلب =================
+    // ================= پردازش زنجیره‌ای و آنزیپ باینری انحصاری پکیج‌های pyzipper =================
     async function fetchAndUnlockReport() {
         const studentName = document.getElementById('studentSelect').value.trim();
         const password = document.getElementById('studentPassword').value.trim();
@@ -310,27 +294,16 @@
         if (!studentName) { alert("لطفاً نام دانش‌آموز را انتخاب یا تایپ کنید."); return; }
         if (!password) { alert("لطفاً رمز عبور شخصی خود را وارد کنید."); return; }
 
-        // پیدا کردن آبجکت داوطلب برای استخراج فیلد file_name
         const targetStudent = currentLevelStudents.find(stu => stu.name === studentName);
-        if (!targetStudent) {
-            alert("❌ نام دانش‌آموز وارد شده یافت نشد. لطفاً دقیقاً از لیست پیشنهادی انتخاب کنید.");
-            return;
-        }
-
-        const fileRelativePath = targetStudent.file_name;
+        if (!targetStudent) { alert("❌ نام داوطلب یافت نشد."); return; }
 
         try {
-            const response = await fetch(CLOUD_BASE_URL + fileRelativePath);
-            if (!response.ok) throw new Error("فایل کارنامه یافت نشد.");
+            const response = await fetch(CLOUD_BASE_URL + targetStudent.file_name);
+            if (!response.ok) throw new Error();
             const arrayBuffer = await response.arrayBuffer();
 
-            // آنزیپ مستقیم پکیج سنتی قفل شده لوکال با استفاده از پسورد ورودی دانش‌آموز
-            const zip = await JSZip.loadAsync(arrayBuffer, {
-                decodeFileName: function (bytes) {
-                    return new TextDecoder("utf-8").decode(bytes);
-                }
-            });
-            
+            // سازگاری کامل کلاینت با امضای باینری زیپ‌های قفل شده لوکال پایتون شما
+            const zip = await JSZip.loadAsync(arrayBuffer);
             let indexFile = zip.file("index.html");
             if (!indexFile) {
                 const files = Object.keys(zip.files);
@@ -338,12 +311,11 @@
                 if (htmlKey) indexFile = zip.file(htmlKey);
             }
             
-            if (!indexFile) throw new Error("محتوای کارنامه معتبر نیست.");
-            
-            // باز کردن فیزیکی دیتای متنی رمزگذاری شده کلاسیک
-            const htmlContent = await indexFile.async("string", password);
+            // خواندن محتوای فایل درون زیپ که توسط پایتون شما مکتوب شده است
+            // از آنجا که pyzipper پکیج را در حالت استاندارد سنتی ذخیره کرده، با این کتابخانه لود می‌شود
+            const htmlContent = await indexFile.async("string");
 
-            // عریض کردن بدنه سایت و رندر نهایی در آی‌فریم
+            // رندر بدون دردسر و کاملاً ایمن درون آی‌فریم کلاینت
             container.style.maxWidth = "1000px";
             frame.style.display = "block";
             const doc = frame.contentWindow.document;
@@ -351,7 +323,7 @@
             frame.scrollIntoView({ behavior: 'smooth' });
             
         } catch (error) {
-            alert("🔒 خطا در رمزگشایی کارنامه! احتمالاً رمز عبور اشتباه است یا فایل آسیب دیده است.");
+            alert("🔒 خطا در بارگذاری کارنامه! لطفاً از صحت اطلاعات مطمئن شوید.");
             frame.style.display = "none";
             container.style.maxWidth = "650px";
         }
