@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>سامانه دریافت کارنامه هوشمند | نیما پیام</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-hover: #1d4ed8;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #1e293b;
+            --text-light: #64748b;
+            --border: #e2e8f0;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 500px;
+            width: 90%;
+            margin: 40px auto;
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+            border: 1px solid var(--border);
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 1.6rem;
+            color: var(--primary);
+            margin-bottom: 25px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        select, input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            box-sizing: border-box;
+            font-family: inherit;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+            background-color: #f1f5f9;
+        }
+
+        select:focus, input:focus {
+            outline: none;
+            border-color: var(--primary);
+            background-color: #fff;
+            box-shadow: 0 0 0 3px rgba(37, 99, 213, 0.1);
+        }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: 1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            margin-top: 10px;
+        }
+
+        button:hover {
+            background-color: var(--primary-hover);
+        }
+
+        #loading {
+            display: none;
+            text-align: center;
+            margin-top: 15px;
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        #report-container {
+            width: 95%;
+            max-width: 1200px;
+            margin: 0 auto 40px auto;
+            display: none;
+        }
+
+        iframe {
+            width: 100%;
+            height: 1000px;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            background: white;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        footer {
+            text-align: center;
+            padding: 20px;
+            margin-top: auto;
+            font-size: 0.85rem;
+            color: var(--text-light);
+            border-top: 1px solid var(--border);
+            background: #fff;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>📊 سامانه دریافت کارنامه آزمون</h1>
+        
+        <div class="form-group">
+            <label for="select-date">🗓️ انتخاب تاریخ آزمون:</label>
+            <select id="select-date" onchange="onDateChange()"><option value="">Loading...</option></select>
+        </div>
+
+        <div class="form-group">
+            <label for="select-institute">🏛️ انتخاب موسسه / مرکز:</label>
+            <select id="select-institute" onchange="onInstituteChange()" disabled><option value="">ابتدا تاریخ را انتخاب کنید</option></select>
+        </div>
+
+        <div class="form-group">
+            <label for="select-level">📌 انتخاب سطح آزمون:</label>
+            <select id="select-level" onchange="onLevelChange()" disabled><option value="">ابتدا موسسه را انتخاب کنید</option></select>
+        </div>
+
+        <div class="form-group">
+            <label for="select-exam">📝 عنوان آزمون:</label>
+            <select id="select-exam" onchange="onExamChange()" disabled><option value="">ابتدا سطح را انتخاب کنید</option></select>
+        </div>
+
+        <div class="form-group">
+            <label for="select-student">👤 نام و نام خانوادگی شما:</label>
+            <select id="select-student" disabled><option value="">ابتدا آزمون را انتخاب کنید</option></select>
+        </div>
+
+        <div class="form-group">
+            <label for="password">🔑 رمز عبور شخصی:</label>
+            <input type="password" id="password" placeholder="رمز عبور موجود در پاسخبرگ خود را وارد کنید">
+        </div>
+
+        <button onclick="loadStudentReport()">🔍 مشاهده و دریافت کارنامه</button>
+        <div id="loading">⏳ در حال رمزگشایی و بارگذاری کارنامه اختصاصی شما...</div>
+    </div>
+
+    <div id="report-container">
+        <iframe id="report-frame"></iframe>
+    </div>
+
+    <footer>
+        <p>✨ طراحی و توسعه توسط <strong>نیما پیام</strong> | کلیه حقوق محفوظ است ✨</p>
+    </footer>
+
+    <script>
+        let db = {};
+        // دیتابیس همیشه از فایل مرکزی که پایتون آپدیت می‌کند خوانده می‌شود
+        const DATA_URL = "reports_list.json"; 
+
+        // ۱. لود اولیه فایل دیتابیس مسابقات و آزمون‌ها
+        async function init() {
+            try {
+                const res = await fetch(DATA_URL + '?t=' + new Date().getTime());
+                db = await res.json();
+                
+                const dateSelect = document.getElementById("select-date");
+                dateSelect.innerHTML = '<option value="">-- انتخاب کنید --</option>';
+                
+                Object.keys(db).sort().reverse().forEach(date => {
+                    dateSelect.innerHTML += `<option value="${date}">${date}</option>`;
+                });
+            } catch (err) {
+                alert("خطا در بارگذاری اطلاعات اولیه دیتابیس وب!");
+                console.error(err);
+            }
+        }
+
+        function onDateChange() {
+            const date = document.getElementById("select-date").value;
+            const instSelect = document.getElementById("select-institute");
+            resetSelects(["select-institute", "select-level", "select-exam", "select-student"]);
+            
+            if (!date) return;
+            instSelect.innerHTML = '<option value="">-- انتخاب کنید --</option>';
+            Object.keys(db[date]).forEach(inst => {
+                instSelect.innerHTML += `<option value="${inst}">${inst}</option>`;
+            });
+            instSelect.disabled = false;
+        }
+
+        function onInstituteChange() {
+            const date = document.getElementById("select-date").value;
+            const inst = document.getElementById("select-institute").value;
+            const lvlSelect = document.getElementById("select-level");
+            resetSelects(["select-level", "select-exam", "select-student"]);
+            
+            if (!inst) return;
+            lvlSelect.innerHTML = '<option value="">-- انتخاب کنید --</option>';
+            Object.keys(db[date][inst]).forEach(lvl => {
+                lvlSelect.innerHTML += `<option value="${lvl}">${lvl}</option>`;
+            });
+            lvlSelect.disabled = false;
+        }
+
+        function onLevelChange() {
+            const date = document.getElementById("select-date").value;
+            const inst = document.getElementById("select-institute").value;
+            const lvl = document.getElementById("select-level").value;
+            const examSelect = document.getElementById("select-exam");
+            resetSelects(["select-exam", "select-student"]);
+            
+            if (!lvl) return;
+            examSelect.innerHTML = '<option value="">-- انتخاب کنید --</option>';
+            Object.keys(db[date][inst][lvl]).forEach(exam => {
+                examSelect.innerHTML += `<option value="${exam}">${exam}</option>`;
+            });
+            examSelect.disabled = false;
+        }
+
+        function onExamChange() {
+            const date = document.getElementById("select-date").value;
+            const inst = document.getElementById("select-institute").value;
+            const lvl = document.getElementById("select-level").value;
+            const exam = document.getElementById("select-exam").value;
+            const studentSelect = document.getElementById("select-student");
+            resetSelects(["select-student"]);
+            
+            if (!exam) return;
+            studentSelect.innerHTML = '<option value="">-- انتخاب کنید --</option>';
+            
+            // مرتب‌سازی لیست الفبایی دانش‌آموزان
+            const students = db[date][inst][lvl][exam].sort((a,b) => a.name.localeCompare(b.name, 'fa'));
+            students.forEach(st => {
+                studentSelect.innerHTML += `<option value="${st.file_name}">${st.name}</option>`;
+            });
+            studentSelect.disabled = false;
+        }
+
+        function resetSelects(ids) {
+            ids.forEach(id => {
+                const el = document.getElementById(id);
+                el.innerHTML = '<option value="">انتخاب مراحل قبلی...</option>';
+                el.disabled = true;
+            });
+            document.getElementById("report-container").style.display = "none";
+        }
+
+        // ۲. فرآیند اصلی دانلود مستقیم، آنزیپ تک لایه‌ای با پسورد و نمایش کارنامه
+        async function loadStudentReport() {
+            const fileUrl = document.getElementById("select-student").value;
+            const password = document.getElementById("password").value.strip ? document.getElementById("password").value.trim() : document.getElementById("password").value;
+            const loading = document.getElementById("loading");
+            const container = document.getElementById("report-container");
+            const iframe = document.getElementById("report-frame");
+
+            if (!fileUrl) { alert("لطفاً نام خود را انتخاب کنید."); return; }
+            if (!password) { alert("لطفاً رمز عبور شخصی خود را وارد کنید."); return; }
+
+            loading.style.display = "block";
+            container.style.display = "none";
+
+            try {
+                // دانلود فایل زیپ تک لایه‌ای
+                const response = await fetch(fileUrl + '?t=' + new Date().getTime());
+                if (!response.ok) throw new Error("فایل کارنامه روی سرور یافت نشد.");
+                
+                const arrayBuffer = await response.arrayBuffer();
+
+                // 🔑 رمزگشایی مستقیم و یک‌مرحله‌ای با پسورد شخصی دانش‌آموز
+                const zip = await JSZip.loadAsync(arrayBuffer, { password: password });
+                
+                // خواندن مستقیم فایل index.html درون زیپ
+                const htmlFile = zip.file("index.html");
+                if (!htmlFile) {
+                    alert("خطا: ساختار داخلی فایل زیپ نامعتبر است (index.html یافت نشد).");
+                    loading.style.display = "none";
+                    return;
+                }
+
+                const htmlContent = await htmlFile.async("string");
+                
+                // رندر و تزریق کدهای HTML کارنامه داخل آی‌فریم بدون مشکل امنیتی و دامنه
+                const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+                iframe.src = URL.createObjectURL(blob);
+                
+                loading.style.display = "none";
+                container.style.display = "block";
+                
+                // اسکرول نرم به سمت بخش کارنامه
+                container.scrollIntoView({ behavior: 'smooth' });
+
+            } catch (error) {
+                loading.style.display = "none";
+                alert("❌ خطا در رمزگشایی! احتمالاً رمز عبور اشتباه است یا فایل زیپ آسیب دیده است.");
+                console.error(error);
+            }
+        }
+
+        // اجرای اولیه پلتفرم وب
+        window.onload = init;
+    </script>
+</body>
+</html>
