@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>سامانه هوشمند و خدمات آنلاین آزمون‌های سمپاد</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: linear-gradient(135deg, #f0f4f8 0%, #d9e2ec 100%);
+            color: #102a43;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 30px;
+            box-shadow: 0 15px 30px rgba(0,0,0,0.1);
+            padding: 30px;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px dashed #bcccdc;
+            padding-bottom: 20px;
+        }
+        header h1 { font-size: 1.8rem; color: #102a43; margin-bottom: 10px; }
+        .tab-container { display: flex; justify-content: center; gap: 15px; margin-bottom: 25px; }
+        .tab-btn {
+            background: #bcccdc; border: none; padding: 12px 25px; font-size: 1rem;
+            font-weight: bold; border-radius: 50px; cursor: pointer; color: #486581; transition: 0.3s;
+        }
+        .tab-btn.active { background: #3b82f6; color: #ffffff; box-shadow: 0 4px 10px rgba(59,130,246,0.3); }
+        .tab-content { display: none; animation: fadeIn 0.4s ease forwards; }
+        .tab-content.active { display: block; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 8px; font-size: 0.95rem; }
+        select, input[type="password"] {
+            width: 100%; padding: 12px 16px; border: 2px solid #cbd5e1; border-radius: 15px; font-size: 1rem; outline: none;
+        }
+        button.action-btn {
+            background: linear-gradient(95deg, #3b82f6, #1d4ed8); border: none; color: white;
+            padding: 14px; font-size: 1.1rem; font-weight: bold; border-radius: 15px; width: 100%; cursor: pointer; margin-top: 15px;
+        }
+        .links-list { list-style: none; margin-top: 15px; }
+        .links-list li {
+            background: #f4f6f8; padding: 15px 20px; border-radius: 15px; margin-bottom: 10px;
+            border-right: 5px solid #ff8c42; display: flex; justify-content: space-between; align-items: center;
+        }
+        .links-list a { color: #1d4ed8; text-decoration: none; font-weight: bold; }
+        #reportViewer { margin-top: 30px; border: 2px solid #cbd5e1; border-radius: 20px; width: 100%; height: 750px; display: none; }
+        .footer { text-align: center; margin-top: 30px; font-size: 0.85rem; color: #627d98; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>سامانه هوشمند و خدمات آنلاین آزمون</h1>
+        <p>طراحی شده توسط نیما پیام</p>
+    </header>
+
+    <div class="tab-container">
+        <button class="tab-btn active" onclick="switchTab('report-tab')">📊 دریافت کارنامه هوشمند</button>
+        <button class="tab-btn" onclick="switchTab('forms-tab')">📝 فرم‌های پاسخبرگ آنلاین</button>
+    </div>
+
+    <div id="report-tab" class="tab-content active">
+        <div class="form-group">
+            <label>🗓️ انتخاب تاریخ آزمون:</label>
+            <select id="examDateSelect" onchange="loadExamInstitutes()"></select>
+        </div>
+        <div class="form-group">
+            <label>🏛️ انتخاب موسسه / مرکز آموزشی:</label>
+            <select id="examInstSelect" onchange="loadExamTitles()"></select>
+        </div>
+        <div class="form-group">
+            <label>🧪 انتخاب عنوان آزمون:</label>
+            <select id="examTitleSelect" onchange="loadExamStudents()"></select>
+        </div>
+        <div class="form-group">
+            <label>👤 انتخاب نام داوطلب (مرتب شده الفبایی):</label>
+            <select id="studentSelect"></select>
+        </div>
+        <div class="form-group">
+            <label>🔐 رمز عبور شخصی داوطلب:</label>
+            <input type="password" id="studentPassword" placeholder="رمزی که هنگام آزمون وارد کرده‌اید">
+        </div>
+        <button class="action-btn" onclick="unlockAndRenderReport()">🔓 پردازش و مشاهده کارنامه تشریحی</button>
+    </div>
+
+    <div id="forms-tab" class="tab-content">
+        <div class="form-group">
+            <label>🗓️ فیلتر پاسخبرگ‌ها بر اساس تاریخ:</label>
+            <select id="formsDateSelect" onchange="renderFormsList()"></select>
+        </div>
+        <ul id="formsContainer" class="links-list"></ul>
+    </div>
+
+    <iframe id="reportViewer"></iframe>
+    <div class="footer">✨ کلیه حقوق این پلتفرم متعلق به <strong>نیما پیام</strong> می‌باشد ✨</div>
+</div>
+
+<script>
+    let reportsDb = {}; let formsDb = {};
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+        event.target.classList.add('active'); document.getElementById(tabId).classList.add('active');
+    }
+
+    window.addEventListener('DOMContentLoaded', async () => {
+        try {
+            const repRes = await fetch('reports_list.json');
+            if (repRes.ok) { reportsDb = await repRes.json(); initReportsDropdown(); }
+            const formRes = await fetch('forms_list.json');
+            if (formRes.ok) { formsDb = await formRes.json(); initFormsDropdown(); }
+        } catch (err) { console.log("خطا در بارگذاری اولیه: " + err); }
+    });
+
+    function initReportsDropdown() {
+        const s = document.getElementById('examDateSelect'); s.innerHTML = '';
+        Object.keys(reportsDb).sort().forEach(date => {
+            let o = document.createElement('option'); o.value = date; o.textContent = date; s.appendChild(o);
+        });
+        loadExamInstitutes();
+    }
+
+    function loadExamInstitutes() {
+        const d = document.getElementById('examDateSelect').value; const s = document.getElementById('examInstSelect'); s.innerHTML = '';
+        if (!d || !reportsDb[d]) return;
+        Object.keys(reportsDb[d]).sort().forEach(inst => {
+            let o = document.createElement('option'); o.value = inst; o.textContent = inst; s.appendChild(o);
+        });
+        loadExamTitles();
+    }
+
+    function loadExamTitles() {
+        const d = document.getElementById('examDateSelect').value; const i = document.getElementById('examInstSelect').value;
+        const s = document.getElementById('examTitleSelect'); s.innerHTML = '';
+        if (!d || !i || !reportsDb[d][i]) return;
+        // پشتیبانی از ساختار جدید و قدیم دیتابیس شما
+        const levelData = reportsDb[d][i];
+        if (levelData["سطح A"] || levelData["سطح B"]) {
+            // ساختار قدیم یا مستقیم سطوح
+            let o = document.createElement('option'); o.value = "default"; o.textContent = "آزمون شبیه‌ساز"; s.appendChild(o);
+        } else {
+            // ساختار جدید و تفکیک شده با عنوان آزمون
+            Object.keys(levelData).sort().forEach(t => {
+                let o = document.createElement('option'); o.value = t; o.textContent = t; s.appendChild(o);
+            });
+        }
+        loadExamStudents();
+    }
+
+    function loadExamStudents() {
+        const d = document.getElementById('examDateSelect').value; const i = document.getElementById('examInstSelect').value;
+        const t = document.getElementById('examTitleSelect').value; const s = document.getElementById('studentSelect'); s.innerHTML = '';
+        if (!d || !i) return;
+
+        let studentsList = []; let target = reportsDb[d][i];
+        if (t && t !== "default" && target[t]) { target = target[t]; }
+
+        Object.keys(target).forEach(lvl => {
+            let records = target[lvl];
+            if (!Array.isArray(records) && typeof records === 'object') {
+                // رفع اختلال لایه‌بندی فرعی آزمون‌ها
+                Object.keys(records).forEach(exKey => { if (Array.isArray(records[exKey])) studentsList = studentsList.concat(records[exKey]); });
+            } else if (Array.isArray(records)) { studentsList = studentsList.concat(records); }
+        });
+
+        // مرتب‌سازی دقیق الفبایی فارسی داوطلبان
+        studentsList.sort((a, b) => a.name.localeCompare(b.name, 'fa'));
+        studentsList.forEach(st => {
+            let o = document.createElement('option'); o.value = st.file_name; o.textContent = st.name; s.appendChild(o);
+        });
+    }
+
+    async function unlockAndRenderReport() {
+        const filePath = document.getElementById('studentSelect').value;
+        const password = document.getElementById('studentPassword').value.trim();
+        const viewer = document.getElementById('reportViewer');
+        if (!filePath || !password) return;
+
+        try {
+            const response = await fetch(filePath);
+            if (!response.ok) throw new Error();
+            const blob = await response.blob();
+            const zip = await JSZip.loadAsync(blob);
+            
+            // اکسترکت و لود فایل index.html کارنامه با پسورد دانش‌آموز
+            let indexFile = zip.file("index.html");
+            if (!indexFile) {
+                // اگر فایل‌های شخصی درون پوشه فشرده شده باشند
+                const files = Object.keys(zip.files);
+                const htmlKey = files.find(f => f.endsWith('index.html'));
+                if (htmlKey) indexFile = zip.file(htmlKey);
+            }
+            
+            const htmlContent = await indexFile.async("string");
+            viewer.src = URL.createObjectURL(new Blob([htmlContent], { type: 'text/html; charset=utf-8' }));
+            viewer.style.display = 'block'; viewer.scrollIntoView({ behavior: 'smooth' });
+        } catch (err) { alert("🔒 خطا: رمز عبور اشتباه است یا فایل کارنامه رمزگذاری نشده است."); viewer.style.display = 'none'; }
+    }
+
+    function initFormsDropdown() {
+        const s = document.getElementById('formsDateSelect'); s.innerHTML = '';
+        Object.keys(formsDb).sort().forEach(date => {
+            let o = document.createElement('option'); o.value = date; o.textContent = date; s.appendChild(o);
+        });
+        renderFormsList();
+    }
+
+    function renderFormsList() {
+        const d = document.getElementById('formsDateSelect').value; const c = document.getElementById('formsContainer'); c.innerHTML = '';
+        if (!d || !formsDb[d]) return;
+        Object.keys(formsDb[d]).sort().forEach(i => {
+            Object.keys(formsDb[d][i]).sort().forEach(t => {
+                let li = document.createElement('li');
+                li.innerHTML = `<span><strong>${i}</strong> - ${t}</span><a href="${formsDb[d][i][t]}" target="_blank">🔗 ورود به پاسخبرگ</a>`;
+                c.appendChild(li);
+            });
+        });
+    }
+</script>
+</body>
+</html>
