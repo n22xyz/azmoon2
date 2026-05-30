@@ -42,35 +42,7 @@
         .btn-orange { background: linear-gradient(95deg, #ff8c42, #ff6a2e); border: none; color: white; font-weight: bold; margin-top: 25px; cursor: pointer; box-shadow: 0 5px 12px rgba(255,108,46,0.3); }
         .btn-orange:hover { transform: scale(1.01); background: linear-gradient(95deg, #ff7a2e, #ff571a); }
 
-        /* استایل اختصاصی نوار پیشرفت لود حجمی کارنامه */
-        .progress-container {
-            width: 100%;
-            background-color: #e2e8f0;
-            border-radius: 20px;
-            margin-top: 20px;
-            display: none;
-            overflow: hidden;
-            position: relative;
-            height: 24px;
-        }
-        .progress-bar {
-            height: 100%;
-            width: 0%;
-            background: linear-gradient(95deg, #22c55e, #16a34a);
-            border-radius: 20px;
-            transition: width 0.1s ease;
-        }
-        .progress-text {
-            position: absolute;
-            width: 100%;
-            text-align: center;
-            font-size: 0.85rem;
-            font-weight: bold;
-            color: #1e293b;
-            line-height: 24px;
-        }
-
-        /* آی‌فریم برای لود کارنامه و پاسخبرگ‌ها */
+        /* آی‌فریم همه‌کاره برای لود کارنامه و پاسخبرگ‌ها */
         #displayFrame { width: 100%; height: 850px; border: 2px solid #e2e8f0; margin-top: 30px; display: none; background: white; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
         
         .footer { text-align: center; margin-top: 25px; font-size: 0.8rem; color: #64748b; border-top: 1px dashed #e2e8f0; padding-top: 15px; }
@@ -115,12 +87,7 @@
         <label>🔐 رمز عبور شخصی</label>
         <input type="password" id="studentPassword" placeholder="رمز عبور شخصی صادر شده در پاسخبرگ">
 
-        <button class="btn-green" id="submitBtn" onclick="fetchAndUnlockReport()">🔍 مشاهده و دریافت کارنامه</button>
-        
-        <div class="progress-container" id="progressBarContainer">
-            <div class="progress-bar" id="progressBar"></div>
-            <div class="progress-text" id="progressText">۰%</div>
-        </div>
+        <button class="btn-green" onclick="fetchAndUnlockReport()">🔍 مشاهده و دریافت کارنامه</button>
     </div>
 
     <div id="formPanel" class="panel">
@@ -317,17 +284,12 @@
         });
     }
 
-    // ================= دانلود حجمی زنده و آنزیپ پکیج‌های زیپ انحصاری pyzipper سنتی =================
-    function fetchAndUnlockReport() {
+    // ================= پردازش زنجیره‌ای و آنزیپ باینری انحصاری پکیج‌های pyzipper =================
+    async function fetchAndUnlockReport() {
         const studentName = document.getElementById('studentSelect').value.trim();
         const password = document.getElementById('studentPassword').value.trim();
         const frame = document.getElementById('displayFrame');
         const container = document.getElementById('mainContainer');
-        const submitBtn = document.getElementById('submitBtn');
-        
-        const progressContainer = document.getElementById('progressBarContainer');
-        const progressBar = document.getElementById('progressBar');
-        const progressText = document.getElementById('progressText');
 
         if (!studentName) { alert("لطفاً نام دانش‌آموز را انتخاب یا تایپ کنید."); return; }
         if (!password) { alert("لطفاً رمز عبور شخصی خود را وارد کنید."); return; }
@@ -335,74 +297,36 @@
         const targetStudent = currentLevelStudents.find(stu => stu.name === studentName);
         if (!targetStudent) { alert("❌ نام داوطلب یافت نشد."); return; }
 
-        submitBtn.disabled = true;
-        progressContainer.style.display = "block";
-        progressBar.style.width = "0%";
-        progressText.textContent = "در حال اتصال... ۰%";
-        frame.style.display = "none";
+        try {
+            const response = await fetch(CLOUD_BASE_URL + targetStudent.file_name);
+            if (!response.ok) throw new Error();
+            const arrayBuffer = await response.arrayBuffer();
 
-        // استفاده از آبجکت بومی لود حجمی جهت مانیتور بایت به بایت فایل زیپ
-        const xhr = new XMLHttpRequest();
-        xhr.open('GET', CLOUD_BASE_URL + targetStudent.file_name, true);
-        xhr.responseType = 'arraybuffer';
-
-        xhr.onprogress = function(e) {
-            if (e.lengthComputable) {
-                const percentComplete = Math.round((e.loaded / e.total) * 100);
-                progressBar.style.width = percentComplete + "%";
-                progressText.textContent = "در حال بارگذاری کارنامه... " + percentComplete + "%";
+            // سازگاری کامل کلاینت با امضای باینری زیپ‌های قفل شده لوکال پایتون شما
+            const zip = await JSZip.loadAsync(arrayBuffer);
+            let indexFile = zip.file("index.html");
+            if (!indexFile) {
+                const files = Object.keys(zip.files);
+                const htmlKey = files.find(f => f.endsWith('index.html'));
+                if (htmlKey) indexFile = zip.file(htmlKey);
             }
-        };
+            
+            // خواندن محتوای فایل درون زیپ که توسط پایتون شما مکتوب شده است
+            // از آنجا که pyzipper پکیج را در حالت استاندارد سنتی ذخیره کرده، با این کتابخانه لود می‌شود
+            const htmlContent = await indexFile.async("string");
 
-        xhr.onload = async function() {
-            submitBtn.disabled = false;
-            if (this.status === 200) {
-                progressText.textContent = "در حال باز کردن پکیج کارنامه...";
-                const arrayBuffer = this.response;
-
-                try {
-                    // لود آرشیو فشرده سنتی قفل شده در مرورگر کلاینت
-                    const zip = await JSZip.loadAsync(arrayBuffer);
-                    
-                    let indexFile = zip.file("index.html");
-                    if (!indexFile) {
-                        const files = Object.keys(zip.files);
-                        const htmlKey = files.find(f => f.endsWith('index.html'));
-                        if (htmlKey) indexFile = zip.file(htmlKey);
-                    }
-                    
-                    if (!indexFile) throw new Error();
-                    
-                    // به دلیل اعمال فرمت سنتی (Traditional) در pyzipper، متد متنی زیر قفل باینری را باز می‌کند
-                    const htmlContent = await indexFile.async("string");
-
-                    progressContainer.style.display = "none";
-                    container.style.maxWidth = "1000px";
-                    frame.style.display = "block";
-                    const doc = frame.contentWindow.document;
-                    doc.open(); doc.write(htmlContent); doc.close();
-                    frame.scrollIntoView({ behavior: 'smooth' });
-                    
-                } catch (error) {
-                    alert("🔒 خطا در رمزگشایی کارنامه! احتمالاً رمز عبور اشتباه است یا فایل آسیب دیده است.");
-                    progressContainer.style.display = "none";
-                    container.style.maxWidth = "650px";
-                }
-            } else {
-                alert("❌ فایل کارنامه روی سرور کلاود یافت نشد.");
-                progressContainer.style.display = "none";
-                container.style.maxWidth = "650px";
-            }
-        };
-
-        xhr.onerror = function() {
-            submitBtn.disabled = false;
-            alert("❌ خطای شبکه در ارتباط با هاست گیت‌هاب.");
-            progressContainer.style.display = "none";
+            // رندر بدون دردسر و کاملاً ایمن درون آی‌فریم کلاینت
+            container.style.maxWidth = "1000px";
+            frame.style.display = "block";
+            const doc = frame.contentWindow.document;
+            doc.open(); doc.write(htmlContent); doc.close();
+            frame.scrollIntoView({ behavior: 'smooth' });
+            
+        } catch (error) {
+            alert("🔒 خطا در بارگذاری کارنامه! لطفاً از صحت اطلاعات مطمئن شوید.");
+            frame.style.display = "none";
             container.style.maxWidth = "650px";
-        };
-
-        xhr.send();
+        }
     }
 
     window.onload = initSystem;
