@@ -42,8 +42,36 @@
         .btn-orange { background: linear-gradient(95deg, #ff8c42, #ff6a2e); border: none; color: white; font-weight: bold; margin-top: 25px; cursor: pointer; box-shadow: 0 5px 12px rgba(255,108,46,0.3); }
         .btn-orange:hover { transform: scale(1.01); background: linear-gradient(95deg, #ff7a2e, #ff571a); }
 
-        /* آی‌فریم همه‌کاره برای لود کارنامه و پاسخبرگ‌ها */
-        #displayFrame { width: 100%; height: 850px; border: 2px solid #e2e8f0; margin-top: 30px; display: none; background: white; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
+        /* استایل نوار پیشرفت لود حجمی کارنامه */
+        .progress-container {
+            width: 100%;
+            background-color: #e2e8f0;
+            border-radius: 20px;
+            margin-top: 20px;
+            display: none;
+            overflow: hidden;
+            position: relative;
+            height: 24px;
+        }
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(95deg, #22c55e, #16a34a);
+            border-radius: 20px;
+            transition: width 0.1s ease;
+        }
+        .progress-text {
+            position: absolute;
+            width: 100%;
+            text-align: center;
+            font-size: 0.85rem;
+            font-weight: bold;
+            color: #1e293b;
+            line-height: 24px;
+        }
+
+        /* آی‌فریم پاسخگو برای نمایش کارنامه‌ها */
+        #displayFrame { width: 100%; height: 900px; border: 2px solid #e2e8f0; margin-top: 30px; display: none; background: white; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); }
         
         .footer { text-align: center; margin-top: 25px; font-size: 0.8rem; color: #64748b; border-top: 1px dashed #e2e8f0; padding-top: 15px; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
@@ -87,7 +115,12 @@
         <label>🔐 رمز عبور شخصی</label>
         <input type="password" id="studentPassword" placeholder="رمز عبور شخصی صادر شده در پاسخبرگ">
 
-        <button class="btn-green" onclick="fetchAndUnlockReport()">🔍 مشاهده و دریافت کارنامه</button>
+        <button class="btn-green" id="submitBtn" onclick="fetchAndUnlockReport()">🔍 مشاهده و دریافت کارنامه</button>
+        
+        <div class="progress-container" id="progressBarContainer">
+            <div class="progress-bar" id="progressBar"></div>
+            <div class="progress-text" id="progressText">۰%</div>
+        </div>
     </div>
 
     <div id="formPanel" class="panel">
@@ -96,12 +129,12 @@
             <option value="">تاریخ پاسخبرگ را انتخاب کنید</option>
         </select>
 
-        <label>🏛️ انتخاب موسسه</label>
+        <label>🏛️ انتخاب موسسه / ارگان</label>
         <select id="fInstSelect" onchange="onFormInstChange()" disabled>
             <option value="">موسسه را انتخاب کنید</option>
         </select>
 
-        <label>🧪 انتخاب عنوان پاسخبرگ</label>
+        <label>🧪 انتخاب عنوان پاسخبرگ (فایل HTML)</label>
         <select id="fExamSelect" disabled>
             <option value="">عنوان پاسخبرگ را انتخاب کنید</option>
         </select>
@@ -120,7 +153,7 @@
     let formsDB = {};
     let currentLevelStudents = [];
 
-    // لود همزمان ساختارها به محض باز شدن سایت
+    // مقداردهی اولیه سیستم و واکشی فایل‌های JSON دیتابیس
     async function initSystem() {
         try {
             const res = await fetch(CLOUD_BASE_URL + 'reports_list.json');
@@ -141,6 +174,7 @@
 
     function populateDateSelect(db, selectId) {
         const select = document.getElementById(selectId);
+        select.innerHTML = '<option value="">انتخاب کنید...</option>';
         Object.keys(db).sort().forEach(date => {
             let option = document.createElement('option');
             option.value = date; 
@@ -159,7 +193,7 @@
         document.getElementById('mainContainer').style.maxWidth = "650px";
     }
 
-    // ================= منطق انتخاب و لود پاسخبرگ‌های فیزیکی =================
+    // ================= منطق تب پاسخبرگ‌های فیزیکی =================
     function onFormDateChange() {
         const date = document.getElementById('fDateSelect').value;
         resetSelects(['fInstSelect', 'fExamSelect']);
@@ -206,7 +240,7 @@
         } catch (error) { alert("خطا در بارگذاری فایل پاسخبرگ"); }
     }
 
-    // ================= منطق انتخاب زنجیره‌ای کارنامه‌ها =================
+    // ================= منطق منوهای زنجیره‌ای کارنامه =================
     function onDateChange() {
         const date = document.getElementById('dateSelect').value;
         resetSelects(['instSelect', 'examSelect', 'levelSelect', 'studentSelect']);
@@ -284,49 +318,112 @@
         });
     }
 
-    // ================= پردازش زنجیره‌ای و آنزیپ باینری انحصاری پکیج‌های pyzipper =================
-    async function fetchAndUnlockReport() {
+    // ================= موتور دکودر پیشرفته و استاندارد متنی (XOR) =================
+    function decryptContent(cipherText, password) {
+        // تبدیل متن بیس۶۴ به بایت‌های باینری خام
+        const binaryStr = atob(cipherText); 
+        const u8Arr = new Uint8Array(binaryStr.length);
+        
+        // معکوس کردن فرآیند الگوریتم ردیف به ردیف XOR پایتون
+        for (let i = 0; i < binaryStr.length; i++) {
+            const cipherChar = binaryStr.charCodeAt(i);
+            const pwdChar = password.charCodeAt(i % password.length);
+            u8Arr[i] = cipherChar ^ pwdChar;
+        }
+        
+        // بازسازی و رندر صحیح کاراکترهای یونیکد فارسی به همراه المان‌های HTML
+        return new TextDecoder("utf-8").decode(u8Arr);
+    }
+
+    // ================= مدیریت فرچ باینری و آنزیپ پکیج کارنامه =================
+    function fetchAndUnlockReport() {
         const studentName = document.getElementById('studentSelect').value.trim();
         const password = document.getElementById('studentPassword').value.trim();
         const frame = document.getElementById('displayFrame');
         const container = document.getElementById('mainContainer');
+        const submitBtn = document.getElementById('submitBtn');
+        
+        const progressContainer = document.getElementById('progressBarContainer');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
 
         if (!studentName) { alert("لطفاً نام دانش‌آموز را انتخاب یا تایپ کنید."); return; }
         if (!password) { alert("لطفاً رمز عبور شخصی خود را وارد کنید."); return; }
 
         const targetStudent = currentLevelStudents.find(stu => stu.name === studentName);
-        if (!targetStudent) { alert("❌ نام داوطلب یافت نشد."); return; }
+        if (!targetStudent) { alert("❌ نام داوطلب در این سطح یافت نشد."); return; }
 
-        try {
-            const response = await fetch(CLOUD_BASE_URL + targetStudent.file_name);
-            if (!response.ok) throw new Error();
-            const arrayBuffer = await response.arrayBuffer();
+        submitBtn.disabled = true;
+        progressContainer.style.display = "block";
+        progressBar.style.width = "0%";
+        progressText.textContent = "در حال اتصال... ۰%";
+        frame.style.display = "none";
 
-            // سازگاری کامل کلاینت با امضای باینری زیپ‌های قفل شده لوکال پایتون شما
-            const zip = await JSZip.loadAsync(arrayBuffer);
-            let indexFile = zip.file("index.html");
-            if (!indexFile) {
-                const files = Object.keys(zip.files);
-                const htmlKey = files.find(f => f.endsWith('index.html'));
-                if (htmlKey) indexFile = zip.file(htmlKey);
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', CLOUD_BASE_URL + targetStudent.file_name, true);
+        // استفاده از فرمت باینری آرایه بافر جهت جلوگیری از اخلال در کاراکترهای وب
+        xhr.responseType = 'arraybuffer';
+
+        xhr.onprogress = function(e) {
+            if (e.lengthComputable) {
+                const percentComplete = Math.round((e.loaded / e.total) * 100);
+                progressBar.style.width = percentComplete + "%";
+                progressText.textContent = "در حال بارگذاری کارنامه... " + percentComplete + "%";
             }
-            
-            // خواندن محتوای فایل درون زیپ که توسط پایتون شما مکتوب شده است
-            // از آنجا که pyzipper پکیج را در حالت استاندارد سنتی ذخیره کرده، با این کتابخانه لود می‌شود
-            const htmlContent = await indexFile.async("string");
+        };
 
-            // رندر بدون دردسر و کاملاً ایمن درون آی‌فریم کلاینت
-            container.style.maxWidth = "1000px";
-            frame.style.display = "block";
-            const doc = frame.contentWindow.document;
-            doc.open(); doc.write(htmlContent); doc.close();
-            frame.scrollIntoView({ behavior: 'smooth' });
-            
-        } catch (error) {
-            alert("🔒 خطا در بارگذاری کارنامه! لطفاً از صحت اطلاعات مطمئن شوید.");
-            frame.style.display = "none";
+        xhr.onload = async function() {
+            submitBtn.disabled = false;
+            if (this.status === 200) {
+                progressText.textContent = "در حال رمزگشایی و بازسازی کارنامه...";
+                const arrayBuffer = this.response;
+
+                try {
+                    const zip = await JSZip.loadAsync(arrayBuffer);
+                    let indexFile = zip.file("index.html");
+                    if (!indexFile) {
+                        const files = Object.keys(zip.files);
+                        const htmlKey = files.find(f => f.endsWith('index.html'));
+                        if (htmlKey) indexFile = zip.file(htmlKey);
+                    }
+                    
+                    if (!indexFile) throw new Error();
+                    
+                    // استخراج رشته متنی قفل شده موجود در زیپ
+                    const base64Content = await indexFile.async("string");
+                    // دکود متنی با پسورد وارد شده توسط داوطلب
+                    const decHtml = decryptContent(base64Content, password);
+
+                    progressContainer.style.display = "none";
+                    container.style.maxWidth = "1000px";
+                    frame.style.display = "block";
+                    
+                    const doc = frame.contentWindow.document;
+                    doc.open(); 
+                    doc.write(decHtml); 
+                    doc.close();
+                    frame.scrollIntoView({ behavior: 'smooth' });
+                    
+                } catch (error) {
+                    alert("🔒 خطا در رمزگشایی کارنامه! احتمالاً رمز عبور اشتباه است یا پکیج مجدداً ساخته نشده است.");
+                    progressContainer.style.display = "none";
+                    container.style.maxWidth = "650px";
+                }
+            } else {
+                alert("❌ فایل کارنامه روی سرور یافت نشد. لطفاً از صحت مسیر اطمینان حاصل کنید.");
+                progressContainer.style.display = "none";
+                container.style.maxWidth = "650px";
+            }
+        };
+
+        xhr.onerror = function() {
+            submitBtn.disabled = false;
+            alert("❌ خطای شبکه در ارتباط با هاست سرور.");
+            progressContainer.style.display = "none";
             container.style.maxWidth = "650px";
-        }
+        };
+
+        xhr.send();
     }
 
     window.onload = initSystem;
