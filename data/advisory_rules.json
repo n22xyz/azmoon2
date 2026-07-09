@@ -1,0 +1,17 @@
+{
+    "subjects": {},
+    "global": {
+        "rules": [
+            {
+                "condition": "overall_percentage > 80",
+                "message": "🎉 تبریک! عملکرد کلی شما بسیار خوب بود.",
+                "type": "excellent"
+            },
+            {
+                "condition": "overall_percentage < 40",
+                "message": "⚠️ وضعیت کلی نیاز به تلاش جدی دارد.",
+                "type": "warning"
+            }
+        ]
+    }
+}
